@@ -1,0 +1,30 @@
+{
+  "manifest_version": 3,
+  "name": "Real Time Sentiment Analysis in the Browser",
+  "version": "1.0",
+  "description": "Displays the current URL, the page's H1, and its sentiment analysis in a side panel.",
+  "permissions": [
+    "scripting",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://localhost:8000/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Real Time Sentiment Analysis",
+    "default_icon": {
+      "16": "thought-bubble.png",
+      "48": "thought-bubble.png",
+      "128": "thought-bubble.png"
+    }
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["scraper.js", "sentiment.js"],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
