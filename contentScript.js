@@ -63,6 +63,11 @@
 	sentimentContainer.appendChild(sentimentScore)
 	contentArea.appendChild(sentimentContainer)
 
+	const analysisTimeParagraph = document.createElement("p")
+	analysisTimeParagraph.style.marginTop = "10px"
+	analysisTimeParagraph.textContent = "Analysed in: Loading..."
+	contentArea.appendChild(analysisTimeParagraph)
+
 	panel.appendChild(contentArea)
 	document.body.appendChild(panel)
 
@@ -119,15 +124,20 @@
 				const sentimentData = await analyzeSentiment(extractedText)
 				sentimentLabel.textContent = sentimentData.label
 				sentimentScore.textContent = sentimentData.score.toFixed(2)
+				analysisTimeParagraph.textContent = `Analysed in: ${sentimentData.analysis_time_ms.toFixed(
+					2
+				)} ms`
 			} else {
 				sentimentLabel.textContent = "N/A"
 				sentimentScore.textContent = ""
+				analysisTimeParagraph.textContent = "Analysed in: N/A"
 			}
 		} catch (error) {
 			console.error("Error during sentiment analysis:", error)
 			h1Paragraph.textContent = "H1: Error extracting text."
 			sentimentLabel.textContent = "Error"
 			sentimentScore.textContent = ""
+			analysisTimeParagraph.textContent = "Analysed in: Error"
 		}
 	}
 
