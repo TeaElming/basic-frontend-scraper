@@ -45,7 +45,7 @@ function extractArticleContent(doc) {
 	const h1 = container.querySelector("h1")
 	if (!h1) {
 		alert("No H1 found on the page.")
-		return ""
+		return []
 	}
 	parts.push({
 		id: "mh",
@@ -54,13 +54,13 @@ function extractArticleContent(doc) {
 
 	// 2) Collect all subheadings (h2-h6) + paragraphs (p) that appear AFTER the h1.
 	const contentNodes = Array.from(
-		container.querySelectorAll("h2, h3, h4, h5, h6, p")
+		container.querySelectorAll("h2, h3, h4, h5, h6, p, img, video")
 	).filter(
 		(node) =>
 			h1.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
 	)
 
-	// Helper to remove <img> or <video> from a <p> node and get clean text.
+	// Helper to extract clean text from a <p> node
 	function getParagraphText(pNode) {
 		const clone = pNode.cloneNode(true)
 		clone.querySelectorAll("img, video").forEach((el) => el.remove())
@@ -70,59 +70,56 @@ function extractArticleContent(doc) {
 	let subheadingCounter = 1
 	let paragraphCounter = 1
 
-	// Keep track of "pending" subheading and the paragraphs belonging to it.
-	let pendingSubheading = null
-	let pendingParagraphs = []
+	// Keep track of the current subheading
+	let currentHeading = null
+	let paragraphBuffer = []
 
-	// Function to finalize the current subheading + paragraphs (if any).
-	function flushSubheadingAndParagraphs() {
-		if (pendingSubheading && pendingParagraphs.length > 0) {
-			// Add the subheading
+	// Function to flush paragraphs into the list
+	function flushParagraphs() {
+		if (currentHeading && paragraphBuffer.length > 0) {
+			// Add subheading if it exists
 			parts.push({
-				id: "sh" + subheadingCounter,
-				content: pendingSubheading.textContent.trim(),
+				id: `sh${subheadingCounter}`,
+				content: currentHeading.textContent.trim(),
 			})
 			subheadingCounter++
 
-			// Add each paragraph
-			for (const pText of pendingParagraphs) {
+			// Add stored paragraphs
+			paragraphBuffer.forEach((pText) => {
 				parts.push({
-					id: "p" + paragraphCounter,
+					id: `p${paragraphCounter}`,
 					content: pText,
 				})
 				paragraphCounter++
-			}
+			})
+
+			// Reset the buffer
+			paragraphBuffer = []
 		}
-		// Reset
-		pendingSubheading = null
-		pendingParagraphs = []
 	}
 
-	// 3) Iterate through the contentNodes
+	// 3) Iterate through elements, ensuring paragraphs after images/videos are included
 	for (let i = 0; i < contentNodes.length; i++) {
 		const node = contentNodes[i]
 
 		if (/^H[2-6]$/.test(node.tagName)) {
-			// We have encountered a new subheading:
-			// First, finalize the previous subheading group.
-			flushSubheadingAndParagraphs()
-
-			// Now this becomes our pending subheading
-			pendingSubheading = node
-			pendingParagraphs = []
+			// Found a new subheading: Flush previous paragraphs
+			flushParagraphs()
+			currentHeading = node
 		} else if (node.tagName === "P") {
-			// If we have a pending subheading, store paragraphs associated with it
-			if (pendingSubheading) {
-				const pText = getParagraphText(node)
-				if (pText) {
-					pendingParagraphs.push(pText)
-				}
+			// Always store paragraphs
+			const pText = getParagraphText(node)
+			if (pText) {
+				paragraphBuffer.push(pText)
 			}
+		} else if (node.tagName === "IMG" || node.tagName === "VIDEO") {
+			// Media files don't reset the heading context, but we store them if followed by a paragraph
+			continue
 		}
 	}
 
-	// Flush the last subheading group if it has paragraphs
-	flushSubheadingAndParagraphs()
+	// Flush the last set of paragraphs
+	flushParagraphs()
 
 	return parts
 }
