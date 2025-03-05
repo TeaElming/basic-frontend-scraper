@@ -227,40 +227,47 @@
 	}, 500)
 
 	// Original sentiment analysis logic (Automatic mode)
-	async function runSentimentAnalysis() {
-		try {
-			const { extractAndProcessText } = await import(
-				chrome.runtime.getURL("scraper-full.js")
-			)
-			const { analyzeSentiment } = await import(
-				chrome.runtime.getURL("sentiment.js")
-			)
-			const extractedText = await extractAndProcessText(window.location.href)
-			const extractedData = JSON.parse(extractedText)
-			const mainHeading =
-				extractedData.find((item) => item.id === "mh")?.content || "No H1 found"
-			h1Paragraph.textContent = "H1: " + mainHeading
+  async function runSentimentAnalysis() {
+    try {
+      const { extractAndProcessText } = await import(
+        chrome.runtime.getURL("scraper-full.js")
+      );
+      const { analyzeSentiment } = await import(
+        chrome.runtime.getURL("sentiment.js")
+      );
 
-			if (extractedText) {
-				const sentimentData = await analyzeSentiment(extractedText)
-				sentimentLabel.textContent = sentimentData.label
-				sentimentScore.textContent = sentimentData.score.toFixed(2)
-				analysisTimeParagraph.textContent = `Analysed in: ${sentimentData.analysis_time_ms.toFixed(
-					2
-				)} ms`
-			} else {
-				sentimentLabel.textContent = "N/A"
-				sentimentScore.textContent = ""
-				analysisTimeParagraph.textContent = "Analysed in: N/A"
-			}
-		} catch (error) {
-			console.error("Error during sentiment analysis:", error)
-			h1Paragraph.textContent = "H1: Error extracting text."
-			sentimentLabel.textContent = "Error"
-			sentimentScore.textContent = ""
-			analysisTimeParagraph.textContent = "Analysed in: Error"
-		}
-	}
+      const extractedData = await extractAndProcessText(window.location.href);
+      console.log("Extracted data:", extractedData); // ✅ Debug
+
+      if (!Array.isArray(extractedData) || extractedData.length === 0) {
+        console.error("Extracted data is invalid or empty.");
+        h1Paragraph.textContent = "H1: No valid content found.";
+        return;
+      }
+
+      // ✅ Display H1 correctly
+      const mainHeading =
+        extractedData.find((item) => item.id === "mh")?.content || "No H1 found";
+      h1Paragraph.textContent = "H1: " + mainHeading;
+
+      // ✅ Send correct JSON structure to API
+      const sentimentData = await analyzeSentiment(extractedData);
+      console.log("Sentiment data:", sentimentData);
+
+      sentimentLabel.textContent = sentimentData.label;
+      sentimentScore.textContent = sentimentData.score.toFixed(2);
+      analysisTimeParagraph.textContent = `Analysed in: ${sentimentData.analysis_time_ms.toFixed(
+        2
+      )} ms`;
+    } catch (error) {
+      console.error("Error during sentiment analysis:", error);
+      h1Paragraph.textContent = "H1: Error extracting text.";
+      sentimentLabel.textContent = "Error";
+      sentimentScore.textContent = "";
+      analysisTimeParagraph.textContent = "Analysed in: Error";
+    }
+  }
+
 
 	// Default mode is auto, so run analysis on load
 	runSentimentAnalysis()

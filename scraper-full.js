@@ -124,5 +124,5 @@ function extractArticleContent(doc) {
 	// Flush the last subheading group if it has paragraphs
 	flushSubheadingAndParagraphs()
 
-	return JSON.stringify(parts, null, 2)
+	return parts
 }
