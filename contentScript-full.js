@@ -1,5 +1,4 @@
 /** @format */
-
 ;(function () {
 	if (document.getElementById("my-extension-side-panel")) return
 
@@ -129,9 +128,7 @@
 
 	// Mode change event: show/hide relevant UI
 	function handleModeChange() {
-		const mode = document.querySelector(
-			'input[name="scrapingMode"]:checked'
-		).value
+		const mode = document.querySelector('input[name="scrapingMode"]:checked').value
 		if (mode === "auto") {
 			manualTextArea.style.display = "none"
 			analyseButton.style.display = "none"
@@ -156,18 +153,14 @@
 		}
 		try {
 			const startTime = performance.now()
-			const { analyzeSentiment } = await import(
-				chrome.runtime.getURL("sentiment.js")
-			)
+			const { analyzeSentiment } = await import(chrome.runtime.getURL("sentiment.js"))
 			const sentimentData = await analyzeSentiment(text)
 			const endTime = performance.now()
 
 			h1Paragraph.textContent = "H1: (Manual Entry)"
 			sentimentLabel.textContent = sentimentData.label
 			sentimentScore.textContent = sentimentData.score.toFixed(2)
-			analysisTimeParagraph.textContent = `Analysed in: ${(
-				endTime - startTime
-			).toFixed(2)} ms`
+			analysisTimeParagraph.textContent = `Analysed in: ${(endTime - startTime).toFixed(2)} ms`
 		} catch (error) {
 			console.error("Error during manual sentiment analysis:", error)
 			h1Paragraph.textContent = "H1: Error in manual analysis."
@@ -190,9 +183,7 @@
 		urlParagraph.textContent = "Current URL: " + window.location.href
 		clearSentimentFields()
 
-		const mode = document.querySelector(
-			'input[name="scrapingMode"]:checked'
-		).value
+		const mode = document.querySelector('input[name="scrapingMode"]:checked').value
 		if (mode === "auto") {
 			runSentimentAnalysis()
 		}
@@ -214,9 +205,7 @@
 		}
 	})(window.history)
 
-	window.addEventListener("popstate", () =>
-		window.dispatchEvent(new Event("locationchange"))
-	)
+	window.addEventListener("popstate", () => window.dispatchEvent(new Event("locationchange")))
 	window.addEventListener("hashchange", updateUrl)
 	window.addEventListener("locationchange", updateUrl)
 
@@ -230,15 +219,11 @@
 
 	async function runSentimentAnalysis() {
 		try {
-			const { extractAndProcessText } = await import(
-				chrome.runtime.getURL("scraper-full.js")
-			)
-			const { analyzeSentiment } = await import(
-				chrome.runtime.getURL("sentiment.js")
-			)
+			const { extractAndProcessText } = await import(chrome.runtime.getURL("scraper-full.js"))
+			const { analyzeSentiment } = await import(chrome.runtime.getURL("sentiment.js"))
 
 			const extractedData = await extractAndProcessText(window.location.href)
-			console.log("Extracted data:", extractedData) //  Debug
+			console.log("Extracted data:", extractedData) // Debug
 
 			if (!Array.isArray(extractedData) || extractedData.length === 0) {
 				console.error("Extracted data is invalid or empty.")
@@ -246,33 +231,41 @@
 				return
 			}
 
-			//  Display H1 correctly
-			const mainHeading =
-				extractedData.find((item) => item.id === "mh")?.content || "No H1 found"
+			// Display H1 correctly
+			const mainHeading = extractedData.find((item) => item.id === "mh")?.content || "No H1 found"
 			h1Paragraph.textContent = "H1: " + mainHeading
 
-			//  Send correct JSON structure to API
-			const { sentimentResults, elapsedTime } = await analyzeSentiment(
-				extractedData
-			)
+			// Send correct JSON structure to API
+			const { sentimentResults, elapsedTime } = await analyzeSentiment(extractedData)
 			console.log("Sentiment data received:", sentimentResults)
 
-			//  Ensure we received an array
 			if (!Array.isArray(sentimentResults)) {
 				console.error("Expected an array but got:", sentimentResults)
 				sentimentContainer.textContent = "Error processing sentiment data."
 				return
 			}
 
-			//  Clear previous sentiment results before adding new ones
+			// Clear previous sentiment results
 			sentimentContainer.innerHTML = "<strong>Sentiment Analysis:</strong>"
 
-			//  Display sentiment scores per section
+			// Display sentiment scores per section and set custom data attributes with colours
 			sentimentResults.forEach(({ id, label, score }) => {
 				const sectionDiv = document.createElement("div")
 				sectionDiv.style.marginTop = "5px"
 				sectionDiv.style.padding = "5px"
 				sectionDiv.style.borderBottom = "1px solid #ddd"
+
+				// Set custom data attribute for background colour styling
+				sectionDiv.setAttribute("data-custom-id", id)
+
+				// Apply background colour based on sentiment label
+				if (label.toLowerCase() === "positive") {
+					sectionDiv.style.backgroundColor = "#d4edda" // light green
+				} else if (label.toLowerCase() === "negative") {
+					sectionDiv.style.backgroundColor = "#f8d7da" // light red
+				} else {
+					sectionDiv.style.backgroundColor = "#fff3cd" // light yellow for neutral/other
+				}
 
 				const sectionTitle = document.createElement("strong")
 				sectionTitle.textContent = id + ": "
@@ -285,10 +278,8 @@
 				sentimentContainer.appendChild(sectionDiv)
 			})
 
-			//  Display elapsed time
-			analysisTimeParagraph.textContent = `Analysed in: ${elapsedTime.toFixed(
-				2
-			)} ms`
+			// Display elapsed time
+			analysisTimeParagraph.textContent = `Analysed in: ${elapsedTime.toFixed(2)} ms`
 		} catch (error) {
 			console.error("Error during sentiment analysis:", error)
 			h1Paragraph.textContent = "H1: Error extracting text."
