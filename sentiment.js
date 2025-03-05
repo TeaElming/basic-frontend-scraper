@@ -71,11 +71,7 @@ export async function analyzeSentiment(textSections) {
 		const endTime = performance.now()
 		const elapsedTime = endTime - startTime
 
-		return {
-			label: data.label || "Unknown",
-			score: data.score || 0.0,
-			analysis_time_ms: elapsedTime,
-		}
+		return { sentimentResults: data, elapsedTime: elapsedTime }
 	} catch (error) {
 		console.error("Error fetching sentiment analysis:", error)
 		return { label: "Error", score: 0.0, analysis_time_ms: 0 }

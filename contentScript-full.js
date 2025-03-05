@@ -40,6 +40,8 @@
 
 	const contentArea = document.createElement("div")
 	contentArea.style.padding = "10px"
+	contentArea.style.overflowY = "auto"
+	contentArea.style.maxHeight = "calc(100% - 50px)"
 
 	// Radio Buttons for mode selection
 	const modeLabel = document.createElement("div")
@@ -226,48 +228,74 @@
 		}
 	}, 500)
 
-	// Original sentiment analysis logic (Automatic mode)
-  async function runSentimentAnalysis() {
-    try {
-      const { extractAndProcessText } = await import(
-        chrome.runtime.getURL("scraper-full.js")
-      );
-      const { analyzeSentiment } = await import(
-        chrome.runtime.getURL("sentiment.js")
-      );
+	async function runSentimentAnalysis() {
+		try {
+			const { extractAndProcessText } = await import(
+				chrome.runtime.getURL("scraper-full.js")
+			)
+			const { analyzeSentiment } = await import(
+				chrome.runtime.getURL("sentiment.js")
+			)
 
-      const extractedData = await extractAndProcessText(window.location.href);
-      console.log("Extracted data:", extractedData); // ✅ Debug
+			const extractedData = await extractAndProcessText(window.location.href)
+			console.log("Extracted data:", extractedData) //  Debug
 
-      if (!Array.isArray(extractedData) || extractedData.length === 0) {
-        console.error("Extracted data is invalid or empty.");
-        h1Paragraph.textContent = "H1: No valid content found.";
-        return;
-      }
+			if (!Array.isArray(extractedData) || extractedData.length === 0) {
+				console.error("Extracted data is invalid or empty.")
+				h1Paragraph.textContent = "H1: No valid content found."
+				return
+			}
 
-      // ✅ Display H1 correctly
-      const mainHeading =
-        extractedData.find((item) => item.id === "mh")?.content || "No H1 found";
-      h1Paragraph.textContent = "H1: " + mainHeading;
+			//  Display H1 correctly
+			const mainHeading =
+				extractedData.find((item) => item.id === "mh")?.content || "No H1 found"
+			h1Paragraph.textContent = "H1: " + mainHeading
 
-      // ✅ Send correct JSON structure to API
-      const sentimentData = await analyzeSentiment(extractedData);
-      console.log("Sentiment data:", sentimentData);
+			//  Send correct JSON structure to API
+			const { sentimentResults, elapsedTime } = await analyzeSentiment(
+				extractedData
+			)
+			console.log("Sentiment data received:", sentimentResults)
 
-      sentimentLabel.textContent = sentimentData.label;
-      sentimentScore.textContent = sentimentData.score.toFixed(2);
-      analysisTimeParagraph.textContent = `Analysed in: ${sentimentData.analysis_time_ms.toFixed(
-        2
-      )} ms`;
-    } catch (error) {
-      console.error("Error during sentiment analysis:", error);
-      h1Paragraph.textContent = "H1: Error extracting text.";
-      sentimentLabel.textContent = "Error";
-      sentimentScore.textContent = "";
-      analysisTimeParagraph.textContent = "Analysed in: Error";
-    }
-  }
+			//  Ensure we received an array
+			if (!Array.isArray(sentimentResults)) {
+				console.error("Expected an array but got:", sentimentResults)
+				sentimentContainer.textContent = "Error processing sentiment data."
+				return
+			}
 
+			//  Clear previous sentiment results before adding new ones
+			sentimentContainer.innerHTML = "<strong>Sentiment Analysis:</strong>"
+
+			//  Display sentiment scores per section
+			sentimentResults.forEach(({ id, label, score }) => {
+				const sectionDiv = document.createElement("div")
+				sectionDiv.style.marginTop = "5px"
+				sectionDiv.style.padding = "5px"
+				sectionDiv.style.borderBottom = "1px solid #ddd"
+
+				const sectionTitle = document.createElement("strong")
+				sectionTitle.textContent = id + ": "
+				sectionDiv.appendChild(sectionTitle)
+
+				const sectionSentiment = document.createElement("span")
+				sectionSentiment.textContent = ` ${label} (Score: ${score.toFixed(2)})`
+				sectionDiv.appendChild(sectionSentiment)
+
+				sentimentContainer.appendChild(sectionDiv)
+			})
+
+			//  Display elapsed time
+			analysisTimeParagraph.textContent = `Analysed in: ${elapsedTime.toFixed(
+				2
+			)} ms`
+		} catch (error) {
+			console.error("Error during sentiment analysis:", error)
+			h1Paragraph.textContent = "H1: Error extracting text."
+			sentimentContainer.textContent = "Error fetching sentiment data."
+			analysisTimeParagraph.textContent = "Analysed in: Error"
+		}
+	}
 
 	// Default mode is auto, so run analysis on load
 	runSentimentAnalysis()
