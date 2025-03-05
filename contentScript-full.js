@@ -2,7 +2,9 @@
 ;(function () {
 	if (document.getElementById("my-extension-side-panel")) return
 
-	// Create the side panel
+	// -------------------------------
+	// Create Side Panel UI
+	// -------------------------------
 	const panel = document.createElement("div")
 	panel.id = "my-extension-side-panel"
 	panel.style.position = "fixed"
@@ -22,10 +24,8 @@
 	header.style.padding = "10px"
 	header.style.backgroundColor = "#f1f1f1"
 	header.style.borderBottom = "1px solid #ccc"
-
 	const title = document.createElement("div")
 	title.textContent = "Side Panel"
-
 	const closeButton = document.createElement("button")
 	closeButton.textContent = "X"
 	closeButton.style.border = "none"
@@ -42,82 +42,23 @@
 	contentArea.style.overflowY = "auto"
 	contentArea.style.maxHeight = "calc(100% - 50px)"
 
-	// Radio Buttons for mode selection
-	const modeLabel = document.createElement("div")
-	modeLabel.textContent = "Mode:"
-	modeLabel.style.marginBottom = "5px"
-	contentArea.appendChild(modeLabel)
-
-	const radioContainer = document.createElement("div")
-	radioContainer.style.marginBottom = "10px"
-
-	const autoRadio = document.createElement("input")
-	autoRadio.type = "radio"
-	autoRadio.name = "scrapingMode"
-	autoRadio.value = "auto"
-	autoRadio.checked = true
-
-	const autoLabel = document.createElement("label")
-	autoLabel.textContent = "Automatic Scraping"
-
-	const manualRadio = document.createElement("input")
-	manualRadio.type = "radio"
-	manualRadio.name = "scrapingMode"
-	manualRadio.value = "manual"
-
-	const manualLabel = document.createElement("label")
-	manualLabel.textContent = "Enter Text"
-
-	radioContainer.appendChild(autoRadio)
-	radioContainer.appendChild(autoLabel)
-	radioContainer.appendChild(document.createElement("br"))
-	radioContainer.appendChild(manualRadio)
-	radioContainer.appendChild(manualLabel)
-
-	contentArea.appendChild(radioContainer)
-
-	// Text area (for manual text entry), hidden by default
-	const manualTextArea = document.createElement("textarea")
-	manualTextArea.rows = 4
-	manualTextArea.style.width = "100%"
-	manualTextArea.style.display = "none"
-
-	const analyseButton = document.createElement("button")
-	analyseButton.textContent = "Analyse"
-	analyseButton.style.display = "none"
-	analyseButton.style.marginTop = "5px"
-
-	contentArea.appendChild(manualTextArea)
-	contentArea.appendChild(analyseButton)
-
-	// Paragraph to show current URL
+	// URL and H1 display
 	const urlParagraph = document.createElement("p")
 	urlParagraph.style.whiteSpace = "normal"
 	urlParagraph.style.wordWrap = "break-word"
 	urlParagraph.textContent = "Current URL: " + window.location.href
 	contentArea.appendChild(urlParagraph)
-
-	// Paragraph to show H1 text
 	const h1Paragraph = document.createElement("p")
 	h1Paragraph.style.whiteSpace = "normal"
 	h1Paragraph.style.wordWrap = "break-word"
 	h1Paragraph.textContent = "H1: Loading..."
 	contentArea.appendChild(h1Paragraph)
 
-	// Sentiment container
+	// Sentiment container and analysis time
 	const sentimentContainer = document.createElement("div")
 	sentimentContainer.style.marginTop = "10px"
-	sentimentContainer.textContent = "Sentiment: "
-	const sentimentLabel = document.createElement("span")
-	sentimentLabel.textContent = "Loading..."
-	const sentimentScore = document.createElement("span")
-	sentimentScore.textContent = ""
-	sentimentContainer.appendChild(sentimentLabel)
-	sentimentContainer.appendChild(document.createTextNode(" Score: "))
-	sentimentContainer.appendChild(sentimentScore)
+	sentimentContainer.innerHTML = "<strong>Sentiment Analysis:</strong>"
 	contentArea.appendChild(sentimentContainer)
-
-	// Analysis time paragraph
 	const analysisTimeParagraph = document.createElement("p")
 	analysisTimeParagraph.style.marginTop = "10px"
 	analysisTimeParagraph.textContent = "Analysed in: Loading..."
@@ -126,70 +67,156 @@
 	panel.appendChild(contentArea)
 	document.body.appendChild(panel)
 
-	// Mode change event: show/hide relevant UI
-	function handleModeChange() {
-		const mode = document.querySelector('input[name="scrapingMode"]:checked').value
-		if (mode === "auto") {
-			manualTextArea.style.display = "none"
-			analyseButton.style.display = "none"
-			// Re-run automatic scraping immediately if URL changed or user toggled back
-			updateUrl()
-		} else {
-			manualTextArea.style.display = "block"
-			analyseButton.style.display = "inline-block"
-		}
-	}
-
-	autoRadio.addEventListener("change", handleModeChange)
-	manualRadio.addEventListener("change", handleModeChange)
-
-	// Analyse button for manual text
-	analyseButton.addEventListener("click", async () => {
-		clearSentimentFields()
-		const text = manualTextArea.value.trim()
-		if (!text) {
-			alert("Please enter text to analyse.")
-			return
-		}
-		try {
-			const startTime = performance.now()
-			const { analyzeSentiment } = await import(chrome.runtime.getURL("sentiment.js"))
-			const sentimentData = await analyzeSentiment(text)
-			const endTime = performance.now()
-
-			h1Paragraph.textContent = "H1: (Manual Entry)"
-			sentimentLabel.textContent = sentimentData.label
-			sentimentScore.textContent = sentimentData.score.toFixed(2)
-			analysisTimeParagraph.textContent = `Analysed in: ${(endTime - startTime).toFixed(2)} ms`
-		} catch (error) {
-			console.error("Error during manual sentiment analysis:", error)
-			h1Paragraph.textContent = "H1: Error in manual analysis."
-			sentimentLabel.textContent = "Error"
-			sentimentScore.textContent = ""
-			analysisTimeParagraph.textContent = "Analysed in: Error"
-		}
-	})
-
-	// Clears sentiment fields before each analysis
+	// -------------------------------
+	// Utility: Clear Sidebar & Overlays
+	// -------------------------------
 	function clearSentimentFields() {
 		h1Paragraph.textContent = "H1: Loading..."
-		sentimentLabel.textContent = "Loading..."
-		sentimentScore.textContent = ""
+		sentimentContainer.innerHTML = "<strong>Sentiment Analysis:</strong>"
 		analysisTimeParagraph.textContent = "Analysed in: Loading..."
 	}
+	function clearPreviousOverlays() {
+		document.querySelectorAll(".sentiment-overlay").forEach((ov) => ov.remove())
+	}
 
-	// Update URL display and trigger scraping if in auto mode
+	// -------------------------------
+	// Overlay Application
+	// -------------------------------
+	// Applies a semi-transparent overlay to an element based on its sentiment.
+	function applyOverlay(element, label) {
+		if (!element) return
+		// Remove existing overlays in this element.
+		element.querySelectorAll(".sentiment-overlay").forEach((ov) => ov.remove())
+		const overlay = document.createElement("div")
+		overlay.className = "sentiment-overlay"
+		overlay.style.position = "absolute"
+		overlay.style.top = "0"
+		overlay.style.left = "0"
+		overlay.style.width = "100%"
+		overlay.style.height = "100%"
+		overlay.style.pointerEvents = "none"
+		overlay.style.zIndex = "1"
+		switch (label.toLowerCase()) {
+			case "positive":
+				overlay.style.backgroundColor = "rgba(212,237,218,0.5)"
+				break
+			case "negative":
+				overlay.style.backgroundColor = "rgba(248,215,218,0.5)"
+				break
+			default:
+				overlay.style.backgroundColor = "rgba(255,243,205,0.5)"
+		}
+		if (window.getComputedStyle(element).position === "static") {
+			element.style.position = "relative"
+		}
+		element.appendChild(overlay)
+	}
+
+	// -------------------------------
+	// Re-Fetching & Sentiment Analysis
+	// -------------------------------
+	// Uses the scraper to tag the live DOM and return fresh article parts,
+	// then passes those parts to the sentiment analysis module.
+	async function runSentimentAnalysis() {
+		try {
+			// Call the scraper. It clears previous tags and re-tags the live DOM.
+			const { extractAndProcessText } = await import(
+				chrome.runtime.getURL("scraper-full.js")
+			)
+			const freshParts = await extractAndProcessText(window.location.href)
+			console.log("Freshly scraped parts:", freshParts)
+			if (!Array.isArray(freshParts) || freshParts.length === 0) {
+				console.error("No valid content found.")
+				h1Paragraph.textContent = "H1: No valid content found."
+				return
+			}
+
+			const mainHeading =
+				freshParts.find((item) => item.id === "mh")?.content || "No H1 found"
+			h1Paragraph.textContent = "H1: " + mainHeading
+
+			const { analyzeSentiment } = await import(
+				chrome.runtime.getURL("sentiment.js")
+			)
+			const { sentimentResults, elapsedTime } = await analyzeSentiment(
+				freshParts
+			)
+			console.log("Sentiment data received:", sentimentResults)
+			if (!Array.isArray(sentimentResults)) {
+				console.error("Expected an array but got:", sentimentResults)
+				sentimentContainer.innerHTML =
+					"<strong>Sentiment Analysis:</strong><br>Error processing sentiment data."
+				return
+			}
+
+			// Clear old results and overlays.
+			sentimentContainer.innerHTML = "<strong>Sentiment Analysis:</strong>"
+			clearPreviousOverlays()
+
+			// For each sentiment result, update the sidebar and apply overlays on all matching DOM elements.
+			sentimentResults.forEach(({ id, label, score }) => {
+				const sectionDiv = document.createElement("div")
+				sectionDiv.style.marginTop = "5px"
+				sectionDiv.style.padding = "5px"
+				sectionDiv.style.borderBottom = "1px solid #ddd"
+				sectionDiv.setAttribute("data-custom-id", id)
+				switch (label.toLowerCase()) {
+					case "positive":
+						sectionDiv.style.backgroundColor = "#d4edda"
+						break
+					case "negative":
+						sectionDiv.style.backgroundColor = "#f8d7da"
+						break
+					default:
+						sectionDiv.style.backgroundColor = "#fff3cd"
+				}
+				const sectionTitle = document.createElement("strong")
+				sectionTitle.textContent = id + ": "
+				sectionDiv.appendChild(sectionTitle)
+				const sectionSentiment = document.createElement("span")
+				sectionSentiment.textContent = ` ${label} (Score: ${score.toFixed(2)})`
+				sectionDiv.appendChild(sectionSentiment)
+				sentimentContainer.appendChild(sectionDiv)
+
+				// Apply overlay to every element with the matching data-sentiment-id.
+				const targetElements = document.querySelectorAll(
+					`[data-sentiment-id="${id}"]`
+				)
+				if (targetElements.length > 0) {
+					targetElements.forEach((el) => applyOverlay(el, label))
+				} else {
+					console.warn(`No DOM element found for sentiment ID: ${id}`)
+				}
+			})
+
+			analysisTimeParagraph.textContent = `Analysed in: ${elapsedTime.toFixed(
+				2
+			)} ms`
+		} catch (error) {
+			console.error("Error during sentiment analysis:", error)
+			h1Paragraph.textContent = "H1: Error extracting text."
+			sentimentContainer.innerHTML =
+				"<strong>Sentiment Analysis:</strong><br>Error fetching sentiment data."
+			analysisTimeParagraph.textContent = "Analysed in: Error"
+		}
+	}
+
+	// -------------------------------
+	// URL Change & Re-scraping Logic
+	// -------------------------------
 	function updateUrl() {
 		urlParagraph.textContent = "Current URL: " + window.location.href
 		clearSentimentFields()
-
-		const mode = document.querySelector('input[name="scrapingMode"]:checked').value
-		if (mode === "auto") {
+		clearPreviousOverlays()
+		console.log(
+			"URL updated. Re-scraping new content for:",
+			window.location.href
+		)
+		setTimeout(() => {
 			runSentimentAnalysis()
-		}
+		}, 1000)
 	}
 
-	// Listen for SPA-like URL changes
 	;(function (history) {
 		const originalPushState = history.pushState
 		history.pushState = function (...args) {
@@ -204,8 +231,9 @@
 			return result
 		}
 	})(window.history)
-
-	window.addEventListener("popstate", () => window.dispatchEvent(new Event("locationchange")))
+	window.addEventListener("popstate", () =>
+		window.dispatchEvent(new Event("locationchange"))
+	)
 	window.addEventListener("hashchange", updateUrl)
 	window.addEventListener("locationchange", updateUrl)
 
@@ -217,77 +245,6 @@
 		}
 	}, 500)
 
-	async function runSentimentAnalysis() {
-		try {
-			const { extractAndProcessText } = await import(chrome.runtime.getURL("scraper-full.js"))
-			const { analyzeSentiment } = await import(chrome.runtime.getURL("sentiment.js"))
-
-			const extractedData = await extractAndProcessText(window.location.href)
-			console.log("Extracted data:", extractedData) // Debug
-
-			if (!Array.isArray(extractedData) || extractedData.length === 0) {
-				console.error("Extracted data is invalid or empty.")
-				h1Paragraph.textContent = "H1: No valid content found."
-				return
-			}
-
-			// Display H1 correctly
-			const mainHeading = extractedData.find((item) => item.id === "mh")?.content || "No H1 found"
-			h1Paragraph.textContent = "H1: " + mainHeading
-
-			// Send correct JSON structure to API
-			const { sentimentResults, elapsedTime } = await analyzeSentiment(extractedData)
-			console.log("Sentiment data received:", sentimentResults)
-
-			if (!Array.isArray(sentimentResults)) {
-				console.error("Expected an array but got:", sentimentResults)
-				sentimentContainer.textContent = "Error processing sentiment data."
-				return
-			}
-
-			// Clear previous sentiment results
-			sentimentContainer.innerHTML = "<strong>Sentiment Analysis:</strong>"
-
-			// Display sentiment scores per section and set custom data attributes with colours
-			sentimentResults.forEach(({ id, label, score }) => {
-				const sectionDiv = document.createElement("div")
-				sectionDiv.style.marginTop = "5px"
-				sectionDiv.style.padding = "5px"
-				sectionDiv.style.borderBottom = "1px solid #ddd"
-
-				// Set custom data attribute for background colour styling
-				sectionDiv.setAttribute("data-custom-id", id)
-
-				// Apply background colour based on sentiment label
-				if (label.toLowerCase() === "positive") {
-					sectionDiv.style.backgroundColor = "#d4edda" // light green
-				} else if (label.toLowerCase() === "negative") {
-					sectionDiv.style.backgroundColor = "#f8d7da" // light red
-				} else {
-					sectionDiv.style.backgroundColor = "#fff3cd" // light yellow for neutral/other
-				}
-
-				const sectionTitle = document.createElement("strong")
-				sectionTitle.textContent = id + ": "
-				sectionDiv.appendChild(sectionTitle)
-
-				const sectionSentiment = document.createElement("span")
-				sectionSentiment.textContent = ` ${label} (Score: ${score.toFixed(2)})`
-				sectionDiv.appendChild(sectionSentiment)
-
-				sentimentContainer.appendChild(sectionDiv)
-			})
-
-			// Display elapsed time
-			analysisTimeParagraph.textContent = `Analysed in: ${elapsedTime.toFixed(2)} ms`
-		} catch (error) {
-			console.error("Error during sentiment analysis:", error)
-			h1Paragraph.textContent = "H1: Error extracting text."
-			sentimentContainer.textContent = "Error fetching sentiment data."
-			analysisTimeParagraph.textContent = "Analysed in: Error"
-		}
-	}
-
-	// Default mode is auto, so run analysis on load
+	// Run analysis on initial load.
 	runSentimentAnalysis()
 })()
