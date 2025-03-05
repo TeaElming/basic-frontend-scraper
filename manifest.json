@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
-  "name": "Real Time Sentiment Analysis in the Browser",
-  "version": "1.0",
+  "name": "Real Time Sentiment Analysis of Scraped Content in the Browser",
+  "version": "1.1.0",
   "description": "Displays the current URL, the page's H1, and its sentiment analysis in a side panel.",
   "permissions": [
     "scripting",
@@ -23,7 +23,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["scraper.js", "sentiment.js"],
+      "resources": ["scraper-full.js", "sentiment.js"],
       "matches": ["<all_urls>"]
     }
   ]
