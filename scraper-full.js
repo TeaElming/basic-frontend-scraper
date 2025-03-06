@@ -1,7 +1,7 @@
 /**
- * Fetches and extracts article parts from a webpage, ensuring both:
- * - Live updates when the URL changes.
- * - Ability to set attributes on live DOM elements.
+ * Fetches and extracts article parts from a webpage while:
+ * - Scraping based on the fetched HTML (`doc`).
+ * - Setting attributes in the live DOM (`document`).
  *
  * @format
  * @param {string} url - The URL to scrape.
@@ -15,8 +15,16 @@ export async function extractAndProcessText(url) {
 		const parser = new DOMParser()
 		const doc = parser.parseFromString(html, "text/html")
 
-		// Extract content from fresh HTML but apply attributes to the live DOM.
-		return extractArticleContent(doc, document)
+		// Clear previous sentiment attributes in the live DOM.
+		clearSentimentAttributes(document)
+
+		// Extract content from the fetched HTML but apply attributes to the live DOM.
+		const parts = extractArticleContent(doc)
+
+		// Apply the attributes from the fetched content to the live DOM.
+		applyAttributesToLiveDOM(doc, document)
+
+		return parts
 	} catch (error) {
 		console.error("Error fetching the page:", error)
 		return []
@@ -24,47 +32,42 @@ export async function extractAndProcessText(url) {
 }
 
 /**
- * Extracts article content (H1, H2-H6, P) and assigns attributes to the live DOM.
+ * Clears all existing `data-sentiment-id` attributes in the live DOM.
  *
- * - Fetches content from `doc` (parsed HTML).
- * - Sets attributes in `liveDoc` (actual webpage DOM).
- *
- * @param {Document} doc - The fetched HTML document.
- * @param {Document} liveDoc - The live DOM document.
- * @returns {Array} - Array of article parts.
+ * @param {Document} liveDoc - The live webpage document.
  */
-function extractArticleContent(doc, liveDoc) {
-	const parts = []
-
-	// Detect container in fetched HTML.
-	const container = doc.querySelector("article") || doc.body
-	const liveContainer = liveDoc.querySelector("article") || liveDoc.body
-
-	// Clear old sentiment attributes in live DOM.
-	liveContainer.querySelectorAll("[data-sentiment-id]").forEach((el) => {
+function clearSentimentAttributes(liveDoc) {
+	liveDoc.querySelectorAll("[data-sentiment-id]").forEach((el) => {
 		el.removeAttribute("data-sentiment-id")
 	})
+	console.log("Cleared all previous sentiment attributes.")
+}
+
+/**
+ * Extracts article content (H1, H2-H6, P) and assigns attributes in the **fetched** document (`doc`).
+ *
+ * @param {Document} doc - The fetched HTML document.
+ * @returns {Array} - Array of article parts.
+ */
+function extractArticleContent(doc) {
+	const parts = []
+	const container = doc.querySelector("article") || doc.body
 
 	// 1) Main heading (H1)
 	const h1 = container.querySelector("h1")
-	const liveH1 = liveContainer.querySelector("h1")
-
-	if (!h1 || !liveH1) {
-		alert("No H1 found on the page.")
+	if (!h1) {
+		console.warn("No H1 found on the page.")
 		return []
 	}
 
-	liveH1.setAttribute("data-sentiment-id", "mh")
+	// Assign sentiment ID in the fetched document (not live yet)
+	h1.setAttribute("data-sentiment-id", "mh")
 	parts.push({ id: "mh", content: h1.textContent.trim() })
 
 	// 2) Collect subheadings (H2-H6) and paragraphs (P) after the H1.
 	const contentNodes = Array.from(
 		container.querySelectorAll("h2, h3, h4, h5, h6, p")
-	).filter(
-		(node) =>
-			h1.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
 	)
-
 	let subheadingCounter = 1
 	let paragraphCounter = 1
 	let currentHeading = null
@@ -72,37 +75,21 @@ function extractArticleContent(doc, liveDoc) {
 
 	function flushParagraphs() {
 		if (currentHeading && paragraphBuffer.length > 0) {
-			// Find and tag the matching subheading in the live DOM.
-			const liveHeading = liveContainer.querySelector(
-				`${currentHeading.tagName}:nth-of-type(${subheadingCounter})`
-			)
-			if (liveHeading) {
-				liveHeading.setAttribute("data-sentiment-id", `sh${subheadingCounter}`)
-			}
-
+			currentHeading.setAttribute("data-sentiment-id", `sh${subheadingCounter}`)
 			parts.push({
 				id: `sh${subheadingCounter}`,
 				content: currentHeading.textContent.trim(),
 			})
 			subheadingCounter++
 
-			// Process and tag each paragraph
-			paragraphBuffer.forEach((pNode, index) => {
-				const liveParagraph = liveContainer.querySelector(
-					`p:nth-of-type(${paragraphCounter + index})`
-				)
-				if (liveParagraph) {
-					liveParagraph.setAttribute(
-						"data-sentiment-id",
-						`p${paragraphCounter + index}`
-					)
-				}
+			paragraphBuffer.forEach((pNode) => {
+				pNode.setAttribute("data-sentiment-id", `p${paragraphCounter}`)
 				parts.push({
-					id: `p${paragraphCounter + index}`,
+					id: `p${paragraphCounter}`,
 					content: pNode.textContent.trim(),
 				})
+				paragraphCounter++
 			})
-			paragraphCounter += paragraphBuffer.length
 			paragraphBuffer = []
 		}
 	}
@@ -124,4 +111,30 @@ function extractArticleContent(doc, liveDoc) {
 
 	console.log("Scraped and tagged parts:", parts)
 	return parts
+}
+
+/**
+ * Copies the `data-sentiment-id` attributes from the fetched HTML (`doc`)
+ * to the live DOM (`liveDoc`) to ensure correct overlays.
+ *
+ * @param {Document} doc - The fetched HTML document (scraped content).
+ * @param {Document} liveDoc - The live webpage document (to apply attributes).
+ */
+function applyAttributesToLiveDOM(doc, liveDoc) {
+	const fetchedElements = doc.querySelectorAll("[data-sentiment-id]")
+	fetchedElements.forEach((fetchedElement) => {
+		const sentimentId = fetchedElement.getAttribute("data-sentiment-id")
+		const textContent = fetchedElement.textContent.trim()
+
+		// Find the matching element in the live DOM
+		const matchingElement = Array.from(
+			liveDoc.querySelectorAll(fetchedElement.tagName)
+		).find((el) => el.textContent.trim() === textContent)
+
+		if (matchingElement) {
+			matchingElement.setAttribute("data-sentiment-id", sentimentId)
+		}
+	})
+
+	console.log("Updated live DOM with new sentiment attributes.")
 }
