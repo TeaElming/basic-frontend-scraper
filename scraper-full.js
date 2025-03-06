@@ -1,5 +1,7 @@
 /**
- * Fetches and extracts article parts from a webpage.
+ * Fetches and extracts article parts from a webpage, ensuring both:
+ * - Live updates when the URL changes.
+ * - Ability to set attributes on live DOM elements.
  *
  * @format
  * @param {string} url - The URL to scrape.
@@ -7,8 +9,14 @@
  */
 export async function extractAndProcessText(url) {
 	try {
-		// For a live DOM scrape, we pass the live document.
-		return extractArticleContent(document)
+		// Fetch fresh HTML content when the URL changes.
+		const response = await fetch(url, { cache: "no-store" })
+		const html = await response.text()
+		const parser = new DOMParser()
+		const doc = parser.parseFromString(html, "text/html")
+
+		// Extract content from fresh HTML but apply attributes to the live DOM.
+		return extractArticleContent(doc, document)
 	} catch (error) {
 		console.error("Error fetching the page:", error)
 		return []
@@ -16,107 +24,103 @@ export async function extractAndProcessText(url) {
 }
 
 /**
- * Extracts the main heading (h1) and (optionally) subheadings (h2-h6) and paragraphs,
- * and tags the live DOM elements with a unique data attribute.
+ * Extracts article content (H1, H2-H6, P) and assigns attributes to the live DOM.
  *
- * Before tagging, any existing [data-sentiment-id] attributes are cleared.
+ * - Fetches content from `doc` (parsed HTML).
+ * - Sets attributes in `liveDoc` (actual webpage DOM).
  *
- * Returns an array like:
- * [
- *   { id: "mh", content: "Main Heading" },
- *   // { id: "sh1", content: "Subheading 1" },
- *   // { id: "p1", content: "Paragraph after subheading 1" },
- *   ...
- * ]
- *
- * @param {Document} doc - The Document to scrape.
+ * @param {Document} doc - The fetched HTML document.
+ * @param {Document} liveDoc - The live DOM document.
  * @returns {Array} - Array of article parts.
  */
-function extractArticleContent(doc) {
+function extractArticleContent(doc, liveDoc) {
 	const parts = []
-	const container = doc.querySelector("article") || doc.body
 
-	// Clear any existing tags so we start fresh.
-	container.querySelectorAll("[data-sentiment-id]").forEach((el) => {
+	// Detect container in fetched HTML.
+	const container = doc.querySelector("article") || doc.body
+	const liveContainer = liveDoc.querySelector("article") || liveDoc.body
+
+	// Clear old sentiment attributes in live DOM.
+	liveContainer.querySelectorAll("[data-sentiment-id]").forEach((el) => {
 		el.removeAttribute("data-sentiment-id")
 	})
 
-	// 1) Main heading (h1)
+	// 1) Main heading (H1)
 	const h1 = container.querySelector("h1")
-	if (!h1) {
+	const liveH1 = liveContainer.querySelector("h1")
+
+	if (!h1 || !liveH1) {
 		alert("No H1 found on the page.")
 		return []
 	}
-	h1.setAttribute("data-sentiment-id", "mh")
-	parts.push({
-		id: "mh",
-		content: h1.textContent.trim(),
-	})
 
-	/*
-	// ============================
-	// COMMENTED OUT: H2-H6 & P SCRAPING
-	// ============================
+	liveH1.setAttribute("data-sentiment-id", "mh")
+	parts.push({ id: "mh", content: h1.textContent.trim() })
 
-	// 2) Collect subheadings (h2-h6) and paragraphs (p) after the H1.
+	// 2) Collect subheadings (H2-H6) and paragraphs (P) after the H1.
 	const contentNodes = Array.from(
-		container.querySelectorAll("h2, h3, h4, h5, h6, p, img, video")
+		container.querySelectorAll("h2, h3, h4, h5, h6, p")
 	).filter(
 		(node) =>
 			h1.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
-	);
+	)
 
-	let subheadingCounter = 1;
-	let paragraphCounter = 1;
-	let currentHeading = null;
-	let paragraphBuffer = [];
+	let subheadingCounter = 1
+	let paragraphCounter = 1
+	let currentHeading = null
+	let paragraphBuffer = []
 
 	function flushParagraphs() {
 		if (currentHeading && paragraphBuffer.length > 0) {
-			if (!currentHeading.hasAttribute("data-sentiment-id")) {
-				currentHeading.setAttribute(
-					"data-sentiment-id",
-					`sh${subheadingCounter}`
-				);
+			// Find and tag the matching subheading in the live DOM.
+			const liveHeading = liveContainer.querySelector(
+				`${currentHeading.tagName}:nth-of-type(${subheadingCounter})`
+			)
+			if (liveHeading) {
+				liveHeading.setAttribute("data-sentiment-id", `sh${subheadingCounter}`)
 			}
+
 			parts.push({
 				id: `sh${subheadingCounter}`,
 				content: currentHeading.textContent.trim(),
-			});
-			subheadingCounter++;
+			})
+			subheadingCounter++
 
-			paragraphBuffer.forEach((pNode) => {
-				if (!pNode.hasAttribute("data-sentiment-id")) {
-					pNode.setAttribute("data-sentiment-id", `p${paragraphCounter}`);
+			// Process and tag each paragraph
+			paragraphBuffer.forEach((pNode, index) => {
+				const liveParagraph = liveContainer.querySelector(
+					`p:nth-of-type(${paragraphCounter + index})`
+				)
+				if (liveParagraph) {
+					liveParagraph.setAttribute(
+						"data-sentiment-id",
+						`p${paragraphCounter + index}`
+					)
 				}
 				parts.push({
-					id: `p${paragraphCounter}`,
+					id: `p${paragraphCounter + index}`,
 					content: pNode.textContent.trim(),
-				});
-				paragraphCounter++;
-			});
-			paragraphBuffer = [];
+				})
+			})
+			paragraphCounter += paragraphBuffer.length
+			paragraphBuffer = []
 		}
 	}
 
+	// 3) Iterate through the content nodes
 	for (let i = 0; i < contentNodes.length; i++) {
-		const node = contentNodes[i];
+		const node = contentNodes[i]
 		if (/^H[2-6]$/.test(node.tagName)) {
-			flushParagraphs();
-			currentHeading = node;
+			flushParagraphs()
+			currentHeading = node
 		} else if (node.tagName === "P") {
-			const text = node.textContent.trim();
+			const text = node.textContent.trim()
 			if (text) {
-				paragraphBuffer.push(node);
+				paragraphBuffer.push(node)
 			}
-		} else if (node.tagName === "IMG" || node.tagName === "VIDEO") {
-			// Skip media nodes.
-			continue;
 		}
 	}
-	flushParagraphs();
-	// ============================
-	*/
+	flushParagraphs()
 
 	console.log("Scraped and tagged parts:", parts)
 	return parts
