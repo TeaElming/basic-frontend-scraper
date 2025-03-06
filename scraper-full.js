@@ -16,7 +16,7 @@ export async function extractAndProcessText(url) {
 }
 
 /**
- * Extracts the main heading (h1), subheadings (h2-h6) and paragraphs,
+ * Extracts the main heading (h1) and (optionally) subheadings (h2-h6) and paragraphs,
  * and tags the live DOM elements with a unique data attribute.
  *
  * Before tagging, any existing [data-sentiment-id] attributes are cleared.
@@ -24,8 +24,8 @@ export async function extractAndProcessText(url) {
  * Returns an array like:
  * [
  *   { id: "mh", content: "Main Heading" },
- *   { id: "sh1", content: "Subheading 1" },
- *   { id: "p1", content: "Paragraph after subheading 1" },
+ *   // { id: "sh1", content: "Subheading 1" },
+ *   // { id: "p1", content: "Paragraph after subheading 1" },
  *   ...
  * ]
  *
@@ -41,7 +41,7 @@ function extractArticleContent(doc) {
 		el.removeAttribute("data-sentiment-id")
 	})
 
-	// 1) Main heading
+	// 1) Main heading (h1)
 	const h1 = container.querySelector("h1")
 	if (!h1) {
 		alert("No H1 found on the page.")
@@ -53,18 +53,23 @@ function extractArticleContent(doc) {
 		content: h1.textContent.trim(),
 	})
 
+	/*
+	// ============================
+	// COMMENTED OUT: H2-H6 & P SCRAPING
+	// ============================
+
 	// 2) Collect subheadings (h2-h6) and paragraphs (p) after the H1.
 	const contentNodes = Array.from(
 		container.querySelectorAll("h2, h3, h4, h5, h6, p, img, video")
 	).filter(
 		(node) =>
 			h1.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING
-	)
+	);
 
-	let subheadingCounter = 1
-	let paragraphCounter = 1
-	let currentHeading = null
-	let paragraphBuffer = []
+	let subheadingCounter = 1;
+	let paragraphCounter = 1;
+	let currentHeading = null;
+	let paragraphBuffer = [];
 
 	function flushParagraphs() {
 		if (currentHeading && paragraphBuffer.length > 0) {
@@ -72,44 +77,46 @@ function extractArticleContent(doc) {
 				currentHeading.setAttribute(
 					"data-sentiment-id",
 					`sh${subheadingCounter}`
-				)
+				);
 			}
 			parts.push({
 				id: `sh${subheadingCounter}`,
 				content: currentHeading.textContent.trim(),
-			})
-			subheadingCounter++
+			});
+			subheadingCounter++;
 
 			paragraphBuffer.forEach((pNode) => {
 				if (!pNode.hasAttribute("data-sentiment-id")) {
-					pNode.setAttribute("data-sentiment-id", `p${paragraphCounter}`)
+					pNode.setAttribute("data-sentiment-id", `p${paragraphCounter}`);
 				}
 				parts.push({
 					id: `p${paragraphCounter}`,
 					content: pNode.textContent.trim(),
-				})
-				paragraphCounter++
-			})
-			paragraphBuffer = []
+				});
+				paragraphCounter++;
+			});
+			paragraphBuffer = [];
 		}
 	}
 
 	for (let i = 0; i < contentNodes.length; i++) {
-		const node = contentNodes[i]
+		const node = contentNodes[i];
 		if (/^H[2-6]$/.test(node.tagName)) {
-			flushParagraphs()
-			currentHeading = node
+			flushParagraphs();
+			currentHeading = node;
 		} else if (node.tagName === "P") {
-			const text = node.textContent.trim()
+			const text = node.textContent.trim();
 			if (text) {
-				paragraphBuffer.push(node)
+				paragraphBuffer.push(node);
 			}
 		} else if (node.tagName === "IMG" || node.tagName === "VIDEO") {
 			// Skip media nodes.
-			continue
+			continue;
 		}
 	}
-	flushParagraphs()
+	flushParagraphs();
+	// ============================
+	*/
 
 	console.log("Scraped and tagged parts:", parts)
 	return parts
